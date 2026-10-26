@@ -5,6 +5,10 @@ import hashlib
 import os
 from pathlib import Path
 import platform
+import signal
+import socket
+import subprocess
+import time
 import tempfile
 import urllib.request
 
@@ -62,7 +66,7 @@ def main():
     parser.add_argument('action', choices=['install', 'run', 'check'])
     parser.add_argument('--port', type=int, default=12890)
     args = parser.parse_args()
-    if not 1024 <= args.port <= 65535:
+    if not 1024 <= args.port <= 65534:
         parser.error('Port must be between 1024 and 65535')
     if args.action == 'install':
         install()
@@ -70,13 +74,43 @@ def main():
         binary = RUNTIME / 'mmwx'
         if not binary.exists() or digest(binary) != DIGESTS[target()]:
             raise SystemExit('Runtime missing or changed. Run: python3 deploy.py install')
-        # Generated configuration contains no credentials and does not modify application data.
+        # Run the pinned upstream behind a gateway; preserve original Host and application data.
         config = RUNTIME / 'preview-config.yaml'
-        config.write_text(f'mode: release\nport: {args.port}\n')
+        backend_port = args.port + 1
+        config.write_text(f'mode: release\nport: {backend_port}\n')
         env = os.environ.copy()
-        env['PORT'] = str(args.port)
-        os.chdir(RUNTIME)
-        os.execve(binary, [str(binary), '-c', str(config)], env)
+        env['PORT'] = str(backend_port)
+        import gateway
+        for port in (args.port, backend_port):
+            with socket.socket() as probe:
+                probe.bind(('0.0.0.0', port))
+        backend = subprocess.Popen([str(binary), '-c', str(config)], cwd=RUNTIME, env=env)
+        def stop(*_):
+            raise KeyboardInterrupt
+        signal.signal(signal.SIGTERM, stop)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        try:
+            for attempt in range(60):
+                if backend.poll() is not None:
+                    raise SystemExit('Official runtime exited before readiness')
+                try:
+                    with opener.open(f'http://127.0.0.1:{backend_port}/', timeout=1):
+                        break
+                except Exception:
+                    time.sleep(.5)
+            else:
+                raise SystemExit('Official runtime did not become ready')
+            print(f'Preview v{(ROOT / "VERSION").read_text().strip()} ready on {args.port}', flush=True)
+            gateway.serve(ROOT, args.port, f'http://127.0.0.1:{backend_port}')
+        except KeyboardInterrupt:
+            pass
+        finally:
+            backend.terminate()
+            try:
+                backend.wait(timeout=8)
+            except subprocess.TimeoutExpired:
+                backend.kill()
+                backend.wait()
     else:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(f'http://127.0.0.1:{args.port}/', timeout=10) as response:
