@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import updater
 import gateway
-PAYLOAD = (ROOT / 'subnest-x-preview-0.2.0.zip').read_bytes()
+RELEASE_VERSION = updater.version(ROOT)
+PAYLOAD = (ROOT / f'subnest-x-preview-{RELEASE_VERSION}.zip').read_bytes()
 
 class UpdateTest(unittest.TestCase):
     def setUp(self):
@@ -36,7 +37,7 @@ class UpdateTest(unittest.TestCase):
     def tearDown(self): self.temp.cleanup()
     def test_valid_signed_package(self):
         manifest,files = updater.verify(self.root,PAYLOAD)
-        self.assertEqual(manifest['version'],'0.2.0')
+        self.assertEqual(manifest['version'],RELEASE_VERSION)
         self.assertIn('web/navigation.css',files)
     def test_release_asset_is_fixed_to_our_repository(self):
         import contextlib
@@ -66,7 +67,7 @@ class UpdateTest(unittest.TestCase):
             for name in source.namelist():out.writestr(name,b'AAAA' if name=='update.sig' else source.read(name))
         with self.assertRaisesRegex(ValueError,'签名'):updater.verify(self.root,data.getvalue())
     def test_same_version_rejected(self):
-        (self.root/'VERSION').write_text('0.2.0')
+        (self.root/'VERSION').write_text(RELEASE_VERSION)
         with self.assertRaisesRegex(ValueError,'更新的'):updater.verify(self.root,PAYLOAD)
     def test_apply_backs_up_and_preserves_database(self):
         updater.apply(self.root,PAYLOAD)
@@ -117,7 +118,7 @@ class UpdateTest(unittest.TestCase):
             self.assertTrue(json.load(post('/__preview/inspect','fixture-only'))['verified'])
             self.assertEqual(json.load(post('/__preview/apply','fixture-only'))['state'],'ready')
             state=json.load(opener.open(base+'/__preview/version'))
-            self.assertEqual(state['running'],'0.1.0');self.assertEqual(state['installed'],'0.2.0');self.assertTrue(state['pending'])
+            self.assertEqual(state['running'],'0.1.0');self.assertEqual(state['installed'],RELEASE_VERSION);self.assertTrue(state['pending'])
         finally:
             for item in [server,backend]:item.shutdown();item.server_close()
 

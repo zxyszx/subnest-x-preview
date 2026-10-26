@@ -6,7 +6,7 @@
     if (panel) return;
     panel = document.createElement('dialog');
     panel.setAttribute('aria-label', '预览更新');
-    panel.style.cssText = 'padding:0;border:1px solid var(--border,#888);border-radius:12px;width:min(560px,94vw);height:min(760px,90dvh);background:var(--background,#fff);color:var(--foreground,#111);';
+    panel.style.cssText = 'margin:auto;padding:0;border:1px solid var(--border,#888);border-radius:12px;width:min(560px,94vw);height:min(760px,90dvh);background:var(--background,#fff);color:var(--foreground,#111);';
     const close = document.createElement('button');
     close.textContent = '关闭'; close.setAttribute('aria-label','关闭预览更新');
     close.style.cssText = 'position:absolute;right:16px;top:12px;z-index:2;cursor:pointer;background:var(--background,#fff);color:var(--foreground,#111);padding:6px 12px;border:1px solid var(--border,#aaa);border-radius:6px;';
