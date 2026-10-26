@@ -5,13 +5,13 @@
   const open = () => {
     if (panel) return;
     panel = document.createElement('dialog');
-    panel.setAttribute('aria-label', '预览更新');
+    panel.setAttribute('aria-label', '检查更新');
     panel.style.cssText = 'margin:auto;padding:0;border:1px solid var(--border,#888);border-radius:12px;width:min(560px,94vw);height:min(760px,90dvh);background:var(--background,#fff);color:var(--foreground,#111);';
     const close = document.createElement('button');
     close.textContent = '关闭'; close.setAttribute('aria-label','关闭预览更新');
     close.style.cssText = 'position:absolute;right:16px;top:12px;z-index:2;cursor:pointer;background:var(--background,#fff);color:var(--foreground,#111);padding:6px 12px;border:1px solid var(--border,#aaa);border-radius:6px;';
     const frame = document.createElement('iframe');
-    frame.title = '预览版本与更新'; frame.src = '/__preview/update';
+    frame.title = '版本更新'; frame.src = '/__preview/update';
     frame.style.cssText = 'width:100%;height:100%;border:0;';
     close.onclick = () => panel.close();
     panel.addEventListener('close', () => { panel.remove(); panel = null; });

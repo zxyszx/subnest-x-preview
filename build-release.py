@@ -10,7 +10,7 @@ import zipfile
 from updater import FILES, version
 root = Path(__file__).resolve().parent
 manifest = {'project': 'zxyszx/subnest-x-preview', 'version': version(root),
-            'notes': ['恢复原版检查更新入口和深色主题样式', '版本号显示本项目运行版本，保留官方程序版本独立性', '保留端口重启修复、在线签名更新及现有数据和设置'],
+            'notes': ['清理更新入口文字和无障碍标签，统一为检查更新', '保持妙妙屋 X 深色主题、字体和版本显示', '保留端口重启修复、在线签名更新及现有数据和设置'],
             'files': {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in FILES}}
 raw = json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode()
 with tempfile.TemporaryDirectory() as folder:
