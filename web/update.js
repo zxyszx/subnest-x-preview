@@ -33,15 +33,17 @@
   },true);
   const rename = () => {
     document.querySelectorAll('[role="menuitem"]').forEach(item => {
-      if (!/^(检查更新|Check for updates|Check Update)$/i.test(item.textContent.trim())) return;
+      if (!/^(检查更新|Check for updates|Check Update|预览更新)$/i.test(item.textContent.trim())) return;
       const walker = document.createTreeWalker(item,NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         if (/^(检查更新|Check for updates|Check Update)$/i.test(walker.currentNode.textContent.trim())) {
-          walker.currentNode.textContent = '预览更新'; break;
+          walker.currentNode.textContent = '检查更新'; break;
         }
       }
     });
   };
+  const updateOwnVersion = async () => { try { const state = await fetch('/__preview/version',{cache:'no-store'}).then(r=>r.json()); document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT); document.querySelectorAll('[role=menuitem], [role=menu]').forEach(menu => { if (!menu.textContent.includes('版本')) return; const walker=document.createTreeWalker(menu,NodeFilter.SHOW_TEXT); while(walker.nextNode()){ if(/^0\.6\.0$/.test(walker.currentNode.textContent.trim())) walker.currentNode.textContent=state.running; } }); } catch {} };
+  updateOwnVersion();
   new MutationObserver(rename).observe(document.documentElement,{childList:true,subtree:true});
   rename();
 })();
