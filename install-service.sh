@@ -33,6 +33,11 @@ EOF
 systemctl daemon-reload
 systemctl enable subnest-x-preview
 systemctl restart subnest-x-preview
+if ! "$python_bin" "$project_dir/deploy.py" wait --port "$port"; then
+  systemctl --no-pager -l status subnest-x-preview || true
+  journalctl -u subnest-x-preview -n 40 --no-pager -o cat || true
+  exit 1
+fi
 systemctl --no-pager status subnest-x-preview
 
 echo "网页维护口令（仅在你自己的服务器终端查看）："

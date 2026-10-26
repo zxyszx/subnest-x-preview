@@ -187,4 +187,5 @@ def serve(root, port, backend):
         if entry.get('to') == server.running:
             (root / 'runtime/last-update.json').write_text(json.dumps(entry))
             pending.unlink()
+    print(f'Preview v{server.running} listening on {port}', flush=True)
     server.serve_forever()

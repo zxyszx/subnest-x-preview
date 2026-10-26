@@ -2,6 +2,7 @@
 """Install a pinned official runtime; never bundle local accounts or databases."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import platform
@@ -61,15 +62,43 @@ def install():
             tmp.unlink(missing_ok=True)
     print(f'Installed verified official {VERSION} for {name}.')
 
+def check_ports(ports):
+    # Like the actual HTTP listener, allow reuse after closed TCP connections.
+    # An active listener still fails; never terminate another process for a port.
+    for port in ports:
+        with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try: probe.bind(('0.0.0.0', port))
+            except OSError as exc:
+                raise SystemExit(f'Cannot bind port {port}: {exc}. Check: ss -ltnp') from exc
+
+def wait_ready(port, expected, timeout=120):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    deadline = time.monotonic() + timeout
+    last = 'service not reachable'
+    while time.monotonic() < deadline:
+        try:
+            with opener.open(f'http://127.0.0.1:{port}/__preview/version', timeout=2) as response:
+                state = json.load(response)
+            if state.get('running') == expected and not state.get('pending'):
+                print(f'Preview v{expected} verified ready on {port}', flush=True)
+                return
+            last = f'waiting for v{expected}, reported running={state.get("running")}'
+        except Exception as exc: last = str(exc)
+        time.sleep(.5)
+    raise SystemExit(f'Readiness failed after {timeout}s: {last}. Check journalctl -u subnest-x-preview -n 80 --no-pager')
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['install', 'run', 'check'])
+    parser.add_argument('action', choices=['install', 'run', 'check', 'wait'])
     parser.add_argument('--port', type=int, default=12890)
     args = parser.parse_args()
     if not 1024 <= args.port <= 65534:
-        parser.error('Port must be between 1024 and 65535')
+        parser.error('Port must be between 1024 and 65534')
     if args.action == 'install':
         install()
+    elif args.action == 'wait':
+        wait_ready(args.port, (ROOT / 'VERSION').read_text().strip())
     elif args.action == 'run':
         binary = RUNTIME / 'mmwx'
         if not binary.exists() or digest(binary) != DIGESTS[target()]:
@@ -81,16 +110,14 @@ def main():
         env = os.environ.copy()
         env['PORT'] = str(backend_port)
         import gateway
-        for port in (args.port, backend_port):
-            with socket.socket() as probe:
-                probe.bind(('0.0.0.0', port))
+        check_ports((args.port, backend_port))
         backend = subprocess.Popen([str(binary), '-c', str(config)], cwd=RUNTIME, env=env)
         def stop(*_):
             raise KeyboardInterrupt
         signal.signal(signal.SIGTERM, stop)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
-            for attempt in range(60):
+            for attempt in range(180):
                 if backend.poll() is not None:
                     raise SystemExit('Official runtime exited before readiness')
                 try:
@@ -100,7 +127,6 @@ def main():
                     time.sleep(.5)
             else:
                 raise SystemExit('Official runtime did not become ready')
-            print(f'Preview v{(ROOT / "VERSION").read_text().strip()} ready on {args.port}', flush=True)
             gateway.serve(ROOT, args.port, f'http://127.0.0.1:{backend_port}')
         except KeyboardInterrupt:
             pass
