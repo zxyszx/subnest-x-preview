@@ -36,7 +36,7 @@ def maintenance_key(root):
             out.write(secrets.token_urlsafe(32))
     return path.read_text().strip()
 
-def verify(root, payload):
+def verify(root, payload, *, allow_same=False):
     if len(payload) > MAX_PACKAGE:
         raise ValueError('更新包超过 4 MiB')
     try:
@@ -66,7 +66,9 @@ def verify(root, payload):
         new = manifest['version']
         if manifest.get('project') != 'zxyszx/subnest-x-preview' or not re.fullmatch(r'\d+\.\d+\.\d+', new):
             raise ValueError('更新包不是此项目的有效版本')
-        if tuple(map(int, new.split('.'))) <= tuple(map(int, version(root).split('.'))):
+        current = tuple(map(int, version(root).split('.')))
+        incoming = tuple(map(int, new.split('.')))
+        if incoming < current or (incoming == current and not allow_same):
             raise ValueError('只能安装比当前版本更新的更新包')
         if set(manifest['files']) != set(FILES):
             raise ValueError('清单不完整')
@@ -105,11 +107,11 @@ def installation_lock(root):
     finally:
         LOCK.release()
 
-def apply(root, payload):
+def apply(root, payload, *, allow_same=False):
     with installation_lock(root):
         if (root / 'runtime/pending-update.json').exists():
             raise ValueError('已有更新等待重启，请先重启服务')
-        manifest, files = verify(root, payload)
+        manifest, files = verify(root, payload, allow_same=allow_same)
         backup = root / 'runtime/backups' / (time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3))
         backup.mkdir(parents=True, mode=0o700)
         existed = []

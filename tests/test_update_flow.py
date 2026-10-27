@@ -121,7 +121,7 @@ class UpdateFlowTests(unittest.TestCase):
         try:
             req=urllib.request.Request('http://127.0.0.1:'+str(server.server_port)+'/__preview/restart',data=b'',headers={'Authorization':'Bearer fixture-only'})
             with mock.patch.object(gateway.subprocess,'run',side_effect=FileNotFoundError('systemctl')):
-                with self.assertRaises(urllib.error.HTTPError) as caught:urllib.request.urlopen(req,timeout=5)
+                with self.assertRaises(urllib.error.HTTPError) as caught:urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req,timeout=5)
             self.assertEqual(caught.exception.code,409)
             self.assertTrue((self.root/'runtime/pending-update.json').exists())
         finally:server.shutdown();server.server_close()

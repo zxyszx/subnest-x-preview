@@ -2,6 +2,8 @@
 import hashlib
 import hmac
 import json
+import sqlite3
+from datetime import datetime, timezone
 import mimetypes
 import re
 from pathlib import Path
@@ -13,7 +15,7 @@ import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qsl
 import updater
 
 PREFIX = '/__preview/'
@@ -21,12 +23,16 @@ PREFIX = '/__preview/'
 RELEASE_API = 'https://api.github.com/repos/zxyszx/subnest-x-preview/releases/latest'
 ASSET_PREFIX = 'https://github.com/zxyszx/subnest-x-preview/releases/download/'
 
-def latest_release():
-    request = urllib.request.Request(RELEASE_API, headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'SubNest-X-Preview'})
+def latest_release(channel="stable"):
+    if channel not in ("stable", "prerelease"): raise ValueError("更新通道无效")
+    request = urllib.request.Request(RELEASE_API if channel == "stable" else RELEASE_API.removesuffix("/latest"), headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'SubNest-X-Preview'})
     with urllib.request.urlopen(request, timeout=20) as response:
         raw = response.read(1024 * 1024 + 1)
     if len(raw) > 1024 * 1024: raise ValueError('版本信息过大')
     release = json.loads(raw)
+    if channel == 'prerelease':
+        release = next((item for item in release if item.get('prerelease') and not item.get('draft')), None)
+        if not release: raise ValueError('当前没有可用的预发布版')
     tag = release.get('tag_name', '')
     import re
     if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag): raise ValueError('发布版本格式无效')
@@ -43,6 +49,30 @@ def download_release():
         payload = response.read(updater.MAX_PACKAGE + 1)
     if len(payload) > updater.MAX_PACKAGE: raise ValueError('更新包超过 4 MiB')
     return payload
+
+def administrator_session(root, cookie):
+    """Validate against the pinned runtime's own sessions; never trust a client role."""
+    try:
+        raw = next((item.strip().split('=', 1)[1] for item in (cookie or '').split(';')
+                    if item.strip().startswith('traffic_info_access_token=')), None)
+        if raw is None: return False
+        token = json.loads(raw)
+        if not isinstance(token, str) or not 1 <= len(token) <= 512: return False
+        db_path = root / 'runtime/data/mmwx.db'
+        with sqlite3.connect(db_path.as_uri() + '?mode=ro', uri=True, timeout=3) as db:
+            row = db.execute('SELECT s.expires_at FROM sessions s JOIN users u ON u.username=s.username '
+                             "WHERE s.token=? AND u.role='admin' AND u.is_active=1", (token,)).fetchone()
+        if not row: return False
+        # The pinned Go runtime stores time.String(), including timezone and monotonic suffix.
+        match = re.match(r'^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.(\d+))? ?([+-]\d{2}:?\d{2}|Z)', row[0])
+        if not match: return False
+        date, clock, fraction, zone = match.groups()
+        zone = zone.replace('Z', '+00:00')
+        if len(zone) == 5: zone = zone[:3] + ':' + zone[3:]
+        expires = datetime.fromisoformat(date+'T'+clock+('.'+fraction[:6] if fraction else '')+zone.replace('Z','+00:00'))
+        return expires > datetime.now(timezone.utc)
+    except (ValueError, TypeError, sqlite3.Error, OSError):
+        return False
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self): self.handle_request()
@@ -78,16 +108,23 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(200, {'running': self.server.running, 'installed': updater.version(self.server.root),
                 'upstream': '0.6.0', 'pending': (self.server.root / 'runtime/pending-update.json').exists()})
         if self.command == 'GET' and name == 'latest':
-            try: return self.json(200, latest_release())
-            except Exception: return self.json(502, {'error': '无法读取公开仓库版本。请检查服务器到 GitHub 的连接或改为导入更新包。'})
+            try: return self.json(200, latest_release(dict(parse_qsl(urlsplit(self.path).query)).get('channel', 'stable')))
+            except ValueError as exc: return self.json(400, {'error': str(exc)})
+            except Exception: return self.json(502, {'error': '无法检查更新，请稍后重试。'})
         if self.command == 'GET' and name in public:
             file = self.server.root / public[name]
             return self.send_bytes(200, file.read_bytes(), (mimetypes.guess_type(file.name)[0] or 'text/plain') + '; charset=utf-8')
-        if self.command != 'POST' or name not in ('inspect', 'apply', 'restart', 'download'):
+        if self.command != 'POST' or name not in ('inspect', 'apply', 'restart', 'download', 'install'):
             return self.json(404, {'error': '未找到更新接口'})
         origin = self.headers.get('Origin')
         if origin and urlsplit(origin).netloc != self.headers.get('Host'):
             return self.json(403, {'error': '拒绝跨站请求'})
+        if name == 'install':
+            if not origin or self.headers.get('X-Requested-With') != 'SubNest-Update':
+                return self.json(403, {'error': '拒绝跨站请求'})
+            if not administrator_session(self.server.root, self.headers.get('Cookie')):
+                return self.json(401, {'error': '管理员登录已失效，请重新登录后重试'})
+            return self.install_release()
         if not self.authorized():
             return self.json(401, {'error': '维护口令不正确。请在服务器读取 runtime/update-key。'})
         if name == 'download':
@@ -121,6 +158,32 @@ class Handler(BaseHTTPRequestHandler):
             return self.json(200, updater.apply(self.server.root, payload))
         except Exception as exc:
             return self.json(400, {'error': str(exc)})
+
+    def install_release(self):
+        """One original update action: verify, back up, install, then restart."""
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+            if not 0 < length <= 1024: raise ValueError('更新请求无效')
+            self.connection.settimeout(10)
+            options = json.loads(self.rfile.read(length))
+            if not isinstance(options, dict) or type(options.get('force')) is not bool: raise ValueError('更新请求无效')
+            result = subprocess.run(['systemctl', 'is-active', '--quiet', 'subnest-x-preview'], timeout=5)
+            if result.returncode: raise ValueError('当前环境不支持在线重启，更新未执行')
+            target = options.get('target')
+            marker = self.server.root / 'runtime/pending-update.json'
+            if marker.exists():
+                if json.loads(marker.read_text()).get('to') != target: raise ValueError('已有其他更新等待重启')
+            else:
+                release = latest_release(options.get('channel', 'stable'))
+                if release['version'] != target: raise ValueError('发布版本已变化，请重新检查')
+                with urllib.request.urlopen(release['url'], timeout=60) as response:
+                    payload = response.read(updater.MAX_PACKAGE + 1)
+                updater.apply(self.server.root, payload, allow_same=options['force'])
+            self.json(202, {'state': 'restarting', 'version': target})
+            threading.Timer(1, lambda: subprocess.Popen(['systemctl', 'restart', 'subnest-x-preview'], start_new_session=True)).start()
+        except (OSError, ValueError, subprocess.SubprocessError):
+            # Do not expose package paths, credentials, or internal maintenance instructions.
+            self.json(400, {'error': '更新未完成，请重新检查后重试；已安装的更新会保留到服务重启。'})
 
     def handle_request(self):
         route = urlsplit(self.path).path
