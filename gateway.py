@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
         route = urlsplit(self.path).path
         if route.startswith(PREFIX): return self.local_update(route)
         if route.startswith('/api/admin/update/apply'):
-            return self.json(409, {'error': '本部署由 SubNest X 预览更新维护，请使用用户菜单中的“预览更新”。'})
+            return self.json(409, {'error': '本部署由 SubNest X 预览更新维护，请使用用户菜单中的“检查更新”。'})
         if self.headers.get('Upgrade', '').lower() == 'websocket':
             return self.websocket()
         try:
