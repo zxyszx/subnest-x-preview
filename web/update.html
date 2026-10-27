@@ -1,26 +1,159 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>检查更新</title>
 <style>
-:root{font-family:var(--font-sans,system-ui);background:var(--popover,#211a2d);color:var(--foreground,#e9e3fb)}*{box-sizing:border-box}html,body{min-height:0!important;height:auto!important}body{margin:0;padding:24px;background:var(--popover,#211a2d);color:var(--foreground,#e9e3fb);font-size:14px;line-height:1.5}h1{font-size:18px;margin:0 32px 6px 0;font-weight:600;display:flex;align-items:center;gap:8px}h1 svg{width:20px;height:20px}h2{font-size:14px;margin:0 0 8px}p{margin:0 0 18px;color:var(--muted-foreground,#c2b7d5)}label{display:block;font-weight:500;margin:12px 0 6px}input,button{font:inherit;min-height:36px;border:1px solid var(--border,#82739a);border-radius:8px;padding:7px 12px}input{width:100%;background:var(--background,#181321);color:inherit}button{cursor:pointer;background:var(--primary,#a78bfa);color:var(--primary-foreground,#191022);border-color:transparent;font-weight:500}button.secondary{background:var(--secondary,#2b233b);color:inherit;border-color:var(--border,#82739a)}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--primary,#a78bfa);outline-offset:2px}.channel{display:flex;gap:8px}.channel button{flex:1}.channel button[aria-pressed=true]{background:var(--primary,#a78bfa);color:var(--primary-foreground,#191022)}#hero{display:flex;min-height:170px;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}#status-icon{color:#00c96b;width:44px;height:44px}#message{font-size:18px;font-weight:600;white-space:pre-wrap}#message[data-error=true]{font-size:14px;color:var(--destructive,#ffadbd)}#version{color:var(--muted-foreground,#c2b7d5);font-size:14px}#remote:empty,#package:empty,#notes:empty{display:none}#remote{max-height:150px;overflow:auto;white-space:pre-wrap;margin:12px 0;color:var(--muted-foreground,#c2b7d5)}#notes{padding-left:20px;max-height:140px;overflow:auto}#latest{width:100%;margin-top:16px}.actions{display:flex;flex-wrap:wrap;gap:8px}.actions:has(button:not([hidden])){margin:12px 0}details{margin-top:16px;border-top:1px solid var(--border,#82739a);padding-top:12px}summary{cursor:pointer;color:var(--muted-foreground,#c2b7d5)}small{display:block;color:var(--muted-foreground,#aaa0bd);margin:6px 0 12px}progress{width:100%;height:8px;accent-color:var(--primary,#a78bfa)}[hidden]{display:none!important}#recheck{margin-top:12px}
+:root{font-family:var(--font-sans,system-ui);background:transparent!important;color:var(--foreground,#e9e3fb)}*{box-sizing:border-box}html,body{min-height:0!important;height:auto!important}body{margin:0;padding:24px;background:transparent!important;color:var(--foreground,#e9e3fb);font-size:14px;font-weight:400;line-height:20px}h1{font-size:18px;margin:0 32px 8px 0;font-weight:600;line-height:18px;display:flex;align-items:center;gap:8px}h1 svg{width:20px;height:20px}h2{font-size:14px;font-weight:500;line-height:20px;margin:0 0 8px}p{margin:0 0 18px;color:var(--muted-foreground,#c2b7d5)}label{display:block;font-weight:500;margin:12px 0 6px}input,button{font:inherit;min-height:36px;border:1px solid var(--border,#82739a);border-radius:var(--radius-md,8px);padding:7px 12px}input{width:100%;background:var(--background,#181321);color:inherit}button{cursor:pointer;background:var(--primary,#a78bfa);color:var(--primary-foreground,#191022);border-color:transparent;font-weight:500}button.secondary{background:var(--secondary,#2b233b);color:inherit;border-color:var(--border,#82739a)}button:disabled{opacity:.5;cursor:default}button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--primary,#a78bfa);outline-offset:2px}.channel{display:flex;gap:8px}.channel button{flex:1}.channel button[aria-pressed=true]{background:var(--primary,#a78bfa);color:var(--primary-foreground,#191022)}#hero{display:flex;min-height:170px;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}#status-icon{color:#00c96b;width:48px;height:48px}#status-icon svg{width:48px;height:48px}button svg{width:16px;height:16px;flex-shrink:0}#latest{display:flex;align-items:center;justify-content:center;gap:8px}#latest[aria-busy=true] svg{animation:update-spin 1s linear infinite}@keyframes update-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){#latest[aria-busy=true] svg{animation:none}}#message{font-size:18px;font-weight:500;line-height:28px;white-space:pre-wrap}#message[data-error=true]{font-size:14px;color:var(--destructive,#ffadbd)}#version{color:var(--muted-foreground,#c2b7d5);font-size:14px}#remote:empty,#package:empty,#notes:empty{display:none}#remote{max-height:150px;overflow:auto;white-space:pre-wrap;margin:12px 0;color:var(--muted-foreground,#c2b7d5)}#notes{padding-left:20px;max-height:140px;overflow:auto}#latest{width:100%;margin-top:16px}.actions{display:flex;flex-wrap:wrap;gap:8px}.actions:has(button:not([hidden])){margin:12px 0}details{margin-top:16px;border-top:1px solid var(--border,#82739a);padding-top:12px}summary{cursor:pointer;color:var(--muted-foreground,#c2b7d5)}small{display:block;color:var(--muted-foreground,#aaa0bd);margin:6px 0 12px}progress{width:100%;height:8px;accent-color:var(--primary,#a78bfa)}[hidden]{display:none!important}#recheck{margin-top:12px}
 </style>
-<h1><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg>检查更新</h1><p>检查是否有新版本可用</p>
+<h1 id="update-heading"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>检查更新</h1><p>检查是否有新版本可用</p>
 <h2>更新通道</h2><div class="channel"><button id="stable" aria-pressed="true">稳定版</button><button id="preview" class="secondary" disabled title="本项目暂未发布预发布版">预发布版</button></div>
 <div id="hero"><span id="status-icon" hidden><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11v1a9 9 0 1 1-5-8"/><path d="m9 11 3 3L22 4"/></svg></span><div id="message" role="status" aria-live="polite">正在检查更新…</div><div id="version">正在读取版本…</div></div><progress id="progress" hidden></progress>
-<div id="remote" hidden></div><button id="release-notes" class="secondary" hidden>查看更新内容</button>
+<div id="remote" hidden></div><button id="release-notes" class="secondary" aria-expanded="false" aria-controls="remote" hidden>查看更新内容</button>
 <div class="actions"><button id="download" hidden disabled>下载更新</button><button id="apply" hidden disabled>安装更新</button><button id="restart" hidden disabled>立即重启</button></div>
-<div id="package"></div><ul id="notes"></ul><button id="latest" class="secondary">重新检查</button>
+<div id="package"></div><ul id="notes"></ul><button id="latest" class="secondary" aria-busy="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg><span>重新检查</span></button>
 <details id="advanced"><summary>手动导入与维护选项</summary><label for="key">维护口令</label><input id="key" type="password" autocomplete="off" placeholder="请输入服务器维护口令"><small>在线安装和手动导入均需要维护口令，仅保留在当前页面内存中。</small><label for="file">签名更新包（ZIP）</label><input id="file" type="file" accept=".zip"><button id="inspect">检查更新包</button><button id="recheck" class="secondary">重新检查状态</button></details>
 <script>
-const $ = id => document.getElementById(id); let verifiedFile=null,target=null,busy=false,remoteAvailable=false;
-const message=(text,error=false)=>{ $('message').textContent=text;$('message').dataset.error=error;if(error)$('status-icon').hidden=true; };
-const request=async(route,body)=>{const response=await fetch('/__preview/'+route,{method:'POST',headers:{Authorization:'Bearer '+$('key').value},body});const result=await response.json();if(!response.ok)throw Error(result.error||'请求失败');return result;};
-async function state(){const response=await fetch('/__preview/version',{cache:'no-store'});if(!response.ok)throw Error('无法读取服务状态');const v=await response.json();$('version').textContent='当前版本 v'+v.running+(v.pending?' · 有更新等待重启':'');$('restart').disabled=!v.pending||busy;$('restart').hidden=!v.pending;return v;}
-function lock(on){busy=on;for(const id of ['inspect','file','key','recheck','latest','stable'])$(id).disabled=on;$('download').disabled=on||!remoteAvailable;$('apply').disabled=on||!verifiedFile;$('apply').hidden=!verifiedFile;$('restart').disabled=on;$('progress').hidden=!on;}
-$('file').onchange=()=>{verifiedFile=null;target=null;$('apply').disabled=true;$('package').textContent='';$('notes').replaceChildren();};
-async function checkLatest(){try{lock(true);message('正在检查公开仓库…');const response=await fetch('/__preview/latest',{cache:'no-store'});const info=await response.json();if(!response.ok)throw Error(info.error);const current=await state();const parts=v=>v.split('.').map(Number);const a=parts(info.version),b=parts(current.running);remoteAvailable=false;for(let i=0;i<3;i++){if(a[i]!==b[i]){remoteAvailable=a[i]>b[i];break;}}$('remote').textContent='最新发布 v'+info.version+'\n'+info.notes;$('release-notes').hidden=!info.notes;$('download').hidden=!remoteAvailable;$('status-icon').hidden=remoteAvailable;message(remoteAvailable?'发现新版本，可下载并检查签名。':'已是最新版本');}catch(error){remoteAvailable=false;message(error.message,true);}finally{lock(false);await state().catch(()=>{});}}
-$('latest').onclick=checkLatest;$('stable').onclick=checkLatest;$('preview').onclick=null;
-$('download').onclick=async()=>{try{if(!$('key').value){$('advanced').open=true;$('key').focus();throw Error('请输入维护口令');}lock(true);message('正在下载并校验签名…');const response=await fetch('/__preview/download',{method:'POST',headers:{Authorization:'Bearer '+$('key').value}});if(!response.ok){const error=await response.json();throw Error(error.error);}const blob=await response.blob();const info=await request('inspect',blob);verifiedFile=blob;target=info.version;$('package').textContent='签名校验通过 · 目标版本 v'+target;$('notes').replaceChildren();for(const text of info.notes){const li=document.createElement('li');li.textContent=text;$('notes').append(li);}message('下载和检查通过，请核对更新内容，再点击安装更新。');}catch(error){verifiedFile=null;message(error.message,true);}finally{lock(false);await state().catch(()=>{});}};
-$('inspect').onclick=async()=>{try{const file=$('file').files[0];if(!file)throw Error('请先选择 ZIP 更新包');if(!$('key').value){$('advanced').open=true;$('key').focus();throw Error('请输入维护口令');}lock(true);message('正在校验项目、签名、版本和文件…');const info=await request('inspect',file);verifiedFile=file;target=info.version;$('package').textContent='签名校验通过 · 目标版本 v'+target;$('notes').replaceChildren();for(const text of info.notes){const item=document.createElement('li');item.textContent=text;$('notes').append(item);}message('检查通过，请核对更新内容，再点击安装更新。');}catch(error){verifiedFile=null;message(error.message,true);}finally{lock(false);await state().catch(()=>{});}};
-$('apply').onclick=async()=>{if(!verifiedFile)return;try{lock(true);message('正在备份并安装更新，请勿重复操作…');const info=await request('apply',verifiedFile);verifiedFile=null;message(info.message);}catch(error){message(error.message,true);}finally{lock(false);await state().catch(()=>{});}};
-$('restart').onclick=async()=>{try{lock(true);const before=await state();target=before.installed;await request('restart');message('正在重启并等待服务恢复…');const deadline=Date.now()+90000;let ok=false;while(Date.now()<deadline){await new Promise(resolve=>setTimeout(resolve,1500));try{const after=await state();if(after.running===target&&!after.pending){ok=true;break;}}catch{}}if(!ok)throw Error('90 秒内未确认目标版本恢复。请查看服务器日志；当前不能标记更新成功。');message('更新成功：服务已恢复，当前运行 v'+target+'。');}catch(error){message(error.message,true);}finally{lock(false);await state().catch(()=>{});}};
-$('release-notes').onclick=()=>{$('remote').hidden=!$('remote').hidden;};$('recheck').onclick=()=>state().then(()=>message('已重新读取运行版本。')).catch(error=>message(error.message,true));checkLatest();
+const $ = id => document.getElementById(id);
+let verifiedFile=null, target=null, busy=false, remoteAvailable=false, currentState=null;
+const message=(text,error=false)=>{
+  $('message').textContent=text;
+  $('message').dataset.error=error;
+  if(error) $('status-icon').hidden=true;
+};
+async function fetchWithTimeout(url,options={},timeout=20000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeout);
+  try{const response=await fetch(url,{...options,signal:controller.signal});response.finish=()=>clearTimeout(timer);return response;}
+  catch(error){clearTimeout(timer);throw Error(error.name==='AbortError'?'请求超时，请检查服务状态后重试。':'无法连接服务，请检查网络或稍后重试。');}
+}
+async function jsonResponse(response){
+  let result;
+  try{result=await response.json();}
+  catch{const error=Error('服务返回非 JSON 响应（HTTP '+response.status+'），请检查反向代理和服务器日志。');error.status=response.status;throw error;}
+  finally{response.finish?.();}
+  if(!response.ok){const error=Error(result.error||'请求失败（HTTP '+response.status+'）');error.status=response.status;throw error;}
+  return result;
+}
+async function request(route,body,timeout=120000){
+  return jsonResponse(await fetchWithTimeout('/__preview/'+route,{method:'POST',headers:{Authorization:'Bearer '+$('key').value},body},timeout));
+}
+function controls(){
+  const pending=currentState?.pending===true;
+  for(const id of ['inspect','file','key','recheck','latest','stable']) $(id).disabled=busy;
+  $('inspect').disabled=busy||pending;
+  $('file').disabled=busy||pending;
+  $('download').hidden=!remoteAvailable||pending;
+  $('download').disabled=busy||!remoteAvailable||pending;
+  $('apply').hidden=!verifiedFile||pending;
+  $('apply').disabled=busy||!verifiedFile||pending;
+  $('restart').hidden=!pending;
+  $('restart').disabled=busy||!pending;
+  $('progress').hidden=!busy;
+}
+function lock(on){busy=on;$('latest').setAttribute('aria-busy',String(on));controls();}
+async function state(){
+  const value=await jsonResponse(await fetchWithTimeout('/__preview/version',{cache:'no-store'},5000));
+  const valid=v=>typeof v==='string'&&/^\d+\.\d+\.\d+$/.test(v);
+  if(!valid(value.running)||!valid(value.installed)||typeof value.pending!=='boolean') throw Error('版本接口返回无效数据，尚未确认更新成功。');
+  currentState=value;
+  $('version').textContent='当前版本：v'+value.running+(value.pending?' · 已安装 v'+value.installed+'，等待重启':'');
+  controls();
+  return value;
+}
+function resetPackage(){verifiedFile=null;target=null;$('package').textContent='';$('notes').replaceChildren();controls();}
+function requireKey(){if(!$('key').value.trim()){$('advanced').open=true;$('key').focus();throw Error('请输入维护口令');}}
+function verified(blob,info){
+  verifiedFile=blob;target=info.version;
+  $('package').textContent='签名校验通过 · 目标版本 v'+target;
+  $('notes').replaceChildren();
+  for(const text of info.notes||[]){const li=document.createElement('li');li.textContent=text;$('notes').append(li);}
+  message('检查通过，请核对更新内容，再点击安装更新。');
+}
+async function checkLatest(){
+  if(busy)return;
+  lock(true);$('status-icon').hidden=true;message('正在检查更新…');
+  try{
+    const current=await state();
+    if(current.pending){message('已安装 v'+current.installed+'，请重启以应用更新。');return;}
+    const info=await jsonResponse(await fetchWithTimeout('/__preview/latest',{cache:'no-store'}));
+    if(!/^\d+\.\d+\.\d+$/.test(info.version))throw Error('发布源返回无效版本，无法判断是否有更新。');
+    const a=info.version.split('.').map(Number),b=current.running.split('.').map(Number);
+    remoteAvailable=false;
+    for(let i=0;i<3;i++){if(a[i]!==b[i]){remoteAvailable=a[i]>b[i];break;}}
+    $('remote').textContent='最新发布 v'+info.version+'\n'+(info.notes||'');
+    $('release-notes').hidden=!info.notes;
+    $('status-icon').hidden=remoteAvailable;
+    message(remoteAvailable?'发现新版本 v'+info.version:'已是最新版本');
+  }catch(error){remoteAvailable=false;message(error.message,true);}
+  finally{lock(false);}
+}
+$('file').onchange=resetPackage;
+$('latest').onclick=checkLatest;
+$('stable').onclick=checkLatest;
+$('download').onclick=async()=>{
+  if(busy)return;
+  resetPackage();
+  try{
+    requireKey();lock(true);message('正在下载并校验签名…');
+    const response=await fetchWithTimeout('/__preview/download',{method:'POST',headers:{Authorization:'Bearer '+$('key').value}},90000);
+    if(!response.ok)await jsonResponse(response);
+    let blob;try{blob=await response.blob();}finally{response.finish?.();}
+    verified(blob,await request('inspect',blob));
+  }catch(error){verifiedFile=null;message(error.message,true);}
+  finally{await state().catch(()=>{});lock(false);}
+};
+$('inspect').onclick=async()=>{
+  if(busy)return;
+  const file=$('file').files[0];resetPackage();
+  try{
+    if(!file)throw Error('请先选择 ZIP 更新包');
+    requireKey();lock(true);message('正在校验项目、签名、版本和文件…');
+    verified(file,await request('inspect',file));
+  }catch(error){verifiedFile=null;message(error.message,true);}
+  finally{await state().catch(()=>{});lock(false);}
+};
+$('apply').onclick=async()=>{
+  if(busy||!verifiedFile)return;
+  try{
+    requireKey();lock(true);message('正在备份并安装更新，请勿关闭或重复操作…');
+    const info=await request('apply',verifiedFile);
+    verifiedFile=null;message(info.message);
+  }catch(error){
+    try{
+      const current=await state();
+      if(current.pending&&current.installed===target){verifiedFile=null;message('已确认文件安装完成，请点击立即重启。');}
+      else message(error.message,true);
+    }catch{message(error.message+' 安装结果尚未确认，请恢复连接后重新检查状态。',true);}
+  }finally{await state().catch(()=>{});lock(false);}
+};
+$('restart').onclick=async()=>{
+  if(busy)return;
+  try{
+    requireKey();lock(true);
+    const before=await state();
+    if(!before.pending)throw Error('当前没有待重启的更新');
+    target=before.installed;
+    try{await request('restart',undefined,8000);}
+    catch(error){if(error.status>=400&&error.status<500)throw error;}
+    message('正在重启并等待 v'+target+' 恢复…');
+    const deadline=Date.now()+120000;let confirmed=false;
+    while(Date.now()<deadline){
+      await new Promise(resolve=>setTimeout(resolve,1500));
+      try{
+        const after=await state();
+        if(after.running===target&&after.installed===target&&after.pending===false){confirmed=true;break;}
+      }catch{}
+    }
+    if(!confirmed)throw Error('120 秒内未确认目标版本恢复。请检查服务器日志；尚未确认更新成功。');
+    verifiedFile=null;remoteAvailable=false;
+    message('更新成功：已确认运行 v'+target+'，可刷新页面。');
+    $('status-icon').hidden=false;
+    if(window.parent!==window)window.parent.postMessage({type:'subnest-update-complete'},location.origin);
+  }catch(error){message(error.message,true);}
+  finally{await state().catch(()=>{});lock(false);}
+};
+$('release-notes').onclick=()=>{$('remote').hidden=!$('remote').hidden;$('release-notes').setAttribute('aria-expanded',String(!$('remote').hidden));};
+$('recheck').onclick=async()=>{
+  if(busy)return;
+  try{const current=await state();message(current.pending?'已安装 v'+current.installed+'，请重启以应用更新。':'已确认运行 v'+current.running+'。');}
+  catch(error){message(error.message,true);}
+};
+checkLatest();
 </script></html>

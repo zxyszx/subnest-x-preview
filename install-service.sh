@@ -40,5 +40,4 @@ if ! "$python_bin" "$project_dir/deploy.py" wait --port "$port"; then
 fi
 systemctl --no-pager status subnest-x-preview
 
-echo "网页维护口令（仅在你自己的服务器终端查看）："
-cat "$project_dir/runtime/update-key" 2>/dev/null || echo "服务启动后执行：cat $project_dir/runtime/update-key"
+echo "查看网页维护口令请在服务器终端执行：cat '$project_dir/runtime/update-key'"

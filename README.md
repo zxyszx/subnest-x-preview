@@ -59,7 +59,23 @@ python3 deploy.py run --port 12890
 
 原版“检查更新”继续保留入口名称，更新本仓库文件，**不更新官方二进制**。更新 UI 与安全边界见 [流程说明](docs/UPDATE-FLOW.md)。
 
-首次从旧版升级：下载发布的 `subnest-x-preview-0.2.5.zip`，上传至服务器，解压覆盖项目文件后执行 `sh install-service.sh`。不要删除或覆盖 `runtime/`。脚本会重启服务，现有管理员、主题和数据保留。
+ZIP 安装的目录可能没有 `.git`，不能用 `git pull` 更新。已有 v0.2.4 安装可使用网页导入签名包，或在项目目录通过现有校验器手动安装（将 ZIP 路径改成实际下载的签名包）：
+
+```sh
+python3 -c 'from pathlib import Path; import updater; print(updater.apply(Path.cwd(), Path("/root/subnest-x-preview-0.2.6.zip").read_bytes()))' &&
+systemctl restart subnest-x-preview &&
+python3 deploy.py wait --port 12890
+```
+
+签名校验、备份和安装成功后才会执行重启。管理员、主题和数据保留。不要直接解压覆盖正在运行的项目。
+
+v0.2.6 起提供统一命令入口：
+
+```sh
+python3 updater.py install --latest --restart
+```
+
+也可用 `python3 updater.py inspect /path/update.zip` 仅校验，或用 `python3 updater.py install /path/update.zip --restart` 安装指定签名包。自定义端口增加 `--port`；省略 `--restart` 只安装并标记待重启。只有运行版本、磁盘版本和待重启状态全部核对通过才报告成功。
 
 之后打开用户菜单 → **检查更新**：
 
@@ -86,3 +102,6 @@ v0.2.3：更新入口恢复为“检查更新”，更新弹窗对齐妙妙屋 X
 
 
 v0.2.5：更新弹窗继承当前主题和原版字体，维护选项默认收起，修复底部空白和动态菜单版本号。更新说明可展开查看。预发布通道暂未接入，明确禁用；实际更新源为本仓库稳定版。
+
+
+v0.2.6：内容哈希前端资源启用缓存和 ETag，减少重复下载；统一更新弹窗遮罩和图标，支持关闭后的焦点恢复。手动与网页更新共用安装锁、签名校验与备份，并补充异常状态确认。原版主题图标未替换，主题切换仍使用原版整页刷新逻辑。

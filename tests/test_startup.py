@@ -38,7 +38,7 @@ class StartupTests(unittest.TestCase):
             restarted.bind(('0.0.0.0',port));restarted.listen()
 
     def test_readiness_waits_for_running_version_and_pending_clear(self):
-        states=[{'running':'0.1.0','pending':False}, {'running':'0.2.2','pending':True}, {'running':'0.2.2','pending':False}]
+        states=[{'running':'0.1.0','installed':'0.2.2','pending':False}, {'running':'0.2.2','installed':'0.2.2','pending':True}, {'running':'0.2.2','installed':'0.1.0','pending':False}, {'running':'0.2.2','installed':'0.2.2','pending':False}]
         class Backend(BaseHTTPRequestHandler):
             requests=0
             def log_message(self,*args):pass
@@ -51,7 +51,7 @@ class StartupTests(unittest.TestCase):
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 deploy.wait_ready(server.server_port,'0.2.2',timeout=5)
-            self.assertEqual(Backend.requests,3)
+            self.assertEqual(Backend.requests,4)
         finally:server.shutdown();server.server_close()
 
     def test_readiness_timeout_is_failure(self):

@@ -80,7 +80,7 @@ def wait_ready(port, expected, timeout=120):
         try:
             with opener.open(f'http://127.0.0.1:{port}/__preview/version', timeout=2) as response:
                 state = json.load(response)
-            if state.get('running') == expected and not state.get('pending'):
+            if state.get('running') == expected and state.get('installed') == expected and state.get('pending') is False:
                 print(f'Preview v{expected} verified ready on {port}', flush=True)
                 return
             last = f'waiting for v{expected}, reported running={state.get("running")}'

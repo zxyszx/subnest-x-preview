@@ -1,5 +1,8 @@
 """Authenticated signed updates for this deployment repository."""
 import ast
+import argparse
+from contextlib import contextmanager
+import fcntl
 import base64
 import hashlib
 import io
@@ -81,10 +84,29 @@ def verify(root, payload):
     except (zipfile.BadZipFile, KeyError, UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError('无效更新包') from exc
 
-def apply(root, payload):
+@contextmanager
+def installation_lock(root):
+    """Serialize manual and web installs, including separate Python processes."""
     if not LOCK.acquire(blocking=False):
         raise ValueError('另一项更新正在进行')
     try:
+        runtime = root / 'runtime'
+        runtime.mkdir(mode=0o700, exist_ok=True)
+        fd = os.open(runtime / 'update.lock', os.O_RDWR | os.O_CREAT, 0o600)
+        with os.fdopen(fd, 'a') as lockfile:
+            try:
+                fcntl.flock(lockfile, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ValueError('另一项更新正在进行') from exc
+            try:
+                yield
+            finally:
+                fcntl.flock(lockfile, fcntl.LOCK_UN)
+    finally:
+        LOCK.release()
+
+def apply(root, payload):
+    with installation_lock(root):
         if (root / 'runtime/pending-update.json').exists():
             raise ValueError('已有更新等待重启，请先重启服务')
         manifest, files = verify(root, payload)
@@ -114,10 +136,14 @@ def apply(root, payload):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 temporary = target.with_name(target.name + '.update-tmp')
                 temporary.write_bytes(content)
+                if target.exists(): temporary.chmod(target.stat().st_mode & 0o777)
                 temporary.replace(target)
                 replaced.append(name)
             pending = {'from': version(backup / 'code'), 'to': manifest['version'], 'backup': str(backup)}
-            (root / 'runtime/pending-update.json').write_text(json.dumps(pending))
+            marker = root / 'runtime/pending-update.json'
+            staging = marker.with_suffix('.json.tmp')
+            staging.write_text(json.dumps(pending))
+            staging.replace(marker)
         except Exception:
             for name in reversed(replaced):
                 if name in existed:
@@ -126,5 +152,46 @@ def apply(root, payload):
                     (root / name).unlink(missing_ok=True)
             raise
         return {'version': manifest['version'], 'state': 'ready', 'message': '更新包已校验并安装，等待重启；尚未确认新版本运行成功。'}
-    finally:
-        LOCK.release()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='校验和安装本项目签名更新包；ZIP 安装无需 Git。')
+    parser.add_argument('action', choices=['inspect', 'install'])
+    parser.add_argument('package', nargs='?', type=Path)
+    parser.add_argument('--latest', action='store_true', help='从本项目稳定版发布源下载')
+    parser.add_argument('--restart', action='store_true', help='安装后重启 systemd 服务并确认运行版本')
+    parser.add_argument('--port', type=int, default=12890)
+    parser.add_argument('--timeout', type=int, default=120)
+    args = parser.parse_args(argv)
+    if bool(args.package) == args.latest:
+        parser.error('请选择本地 ZIP 或 --latest，不能同时使用')
+    if not 1024 <= args.port <= 65534 or args.timeout <= 0:
+        parser.error('端口或等待时间无效')
+    if args.restart and args.action != 'install':
+        parser.error('--restart 仅用于 install')
+    root = Path(__file__).resolve().parent
+    try:
+        if args.latest:
+            import gateway
+            payload = gateway.download_release()
+        else:
+            with args.package.open('rb') as stream:
+                payload = stream.read(MAX_PACKAGE + 1)
+        if args.action == 'inspect':
+            manifest, _ = verify(root, payload)
+            print('签名校验通过，目标版本 v' + manifest['version'])
+            return
+        result = apply(root, payload)
+        print(result['message'], flush=True)
+        if args.restart:
+            subprocess.run(['systemctl', 'restart', 'subnest-x-preview'], check=True, timeout=30)
+            from deploy import wait_ready
+            wait_ready(args.port, result['version'], timeout=args.timeout)
+            print('更新成功，已确认运行 v' + result['version'])
+        else:
+            print('尚未重启。请重启服务后执行 python3 deploy.py wait，并为自定义端口增加 --port。')
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        parser.exit(1, '更新失败：' + str(exc) + '\n安装失败时不会继续重启；若文件已安装，请检查服务状态及待重启状态。\n')
+
+if __name__ == '__main__':
+    main()

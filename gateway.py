@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import mimetypes
+import re
 from pathlib import Path
 import select
 import socket
@@ -147,14 +148,29 @@ class Handler(BaseHTTPRequestHandler):
                 finally: response.close()
                 return
             data = response.read(); response.close()
+            # Only immutable, content-hashed frontend builds may be cached long term.
+            # Never apply this policy to HTML, APIs, credentials or uploaded images.
+            asset = self.command == 'GET' and response.status == 200 and re.fullmatch(
+                r'/assets/[A-Za-z0-9_./-]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|svg|webp)', route)
+            etag = '"' + hashlib.sha256(data).hexdigest() + '"' if asset else None
+            if asset and any(value.strip().removeprefix('W/') in (etag, '*')
+                             for value in self.headers.get('If-None-Match', '').split(',')):
+                self.send_response(304)
+                self.send_header('ETag', etag)
+                self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+                self.end_headers()
+                return
             if 'text/html' in response.headers.get('Content-Type','') and b'</head>' in data:
                 tags = ('<link rel="stylesheet" href="/__preview/navigation.css?v=' + self.server.running + '">'
                         '<script defer src="/__preview/update.js?v=' + self.server.running + '"></script>').encode()
                 data = data.replace(b'</head>', tags + b'</head>', 1)
             self.send_response(response.status)
             for key,value in response.headers.items():
-                if key.lower() not in ('connection','content-length','content-encoding','transfer-encoding','etag'):
+                if key.lower() not in ('connection','content-length','content-encoding','transfer-encoding','etag') and not (asset and key.lower() == 'cache-control'):
                     self.send_header(key,value)
+            if asset:
+                self.send_header('ETag', etag)
+                self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
             self.send_header('Content-Length',str(len(data)))
             self.end_headers(); self.wfile.write(data)
         except (BrokenPipeError,ConnectionResetError,TimeoutError): pass
@@ -175,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
         except OSError: pass
         finally: self.close_connection = True
 
-def serve(root, port, backend):
+def create_server(root, port, backend):
     # Server starts only after the official runtime passes HTTP readiness.
     server = ThreadingHTTPServer(('0.0.0.0',port),Handler)
     server.root, server.backend = root, backend
@@ -187,5 +203,12 @@ def serve(root, port, backend):
         if entry.get('to') == server.running:
             (root / 'runtime/last-update.json').write_text(json.dumps(entry))
             pending.unlink()
+    return server
+
+def serve(root, port, backend):
+    server = create_server(root, port, backend)
     print(f'Preview v{server.running} listening on {port}', flush=True)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
